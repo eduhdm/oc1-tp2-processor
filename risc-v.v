@@ -16,7 +16,16 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     inst_mem[0] <= 32'h00000000; // nop
     inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
     inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
-    inst_mem[3] <= 32'h0050A424; // ss  x5, x1, 8  [novo comando]
+    // ---- ss
+    // imm1   |rs2  |rs1  |fu3|im2  |opc
+    // 0000000|00001|00101|000|01000|0100100 = 128424
+    inst_mem[3] <= 32'h00128424; // ss  x5, x1, 8  [novo comando]
+    // ----
+    // ---- lwi
+    // imm1   |rs2  |rs1  |im3|rd   |opc
+    // 0000000|00010|00010|000|00001|0000100 = 210084
+    inst_mem[4] <= 32'h00210084; // lwi x1, x2, x2 [novo comando]
+    // ----
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -53,7 +62,6 @@ module decode (
   wire [6:0] opcode;
   wire [9:0] funct;
   wire [31:0] ImmGen;
-
   assign opcode = inst[6:0];
   assign rs1    = inst[19:15];
   assign rs2    = inst[24:20];
@@ -115,6 +123,13 @@ module ControlUnit (
       end
       7'b0000011: begin // lw == 3
         alusrc   <= 1;
+        memtoreg <= 1;
+        regwrite <= 1;
+        memread  <= 1;
+        ImmGen   <= {{20{inst[31]}},inst[31:20]};
+      end
+      7'b0000100: begin // lwi == 4
+        alusrc   <= 0; // adress é calculado de rs1 + rs2 quando alusrc = 0
         memtoreg <= 1;
         regwrite <= 1;
         memread  <= 1;
@@ -233,7 +248,7 @@ module memory (
   output [31:0] readdata
 );
 
-  wire [31:0] adress = adressSrc ? data1 : aluout; // Adress MUX
+  wire [31:0] address = adressSrc ? data1 : aluout; // Adress MUX
   wire [31:0] writeData = writeDataSrc ? aluout : data2; // Write data mux
 
   integer i;
