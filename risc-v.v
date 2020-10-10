@@ -50,13 +50,13 @@ module decode (
   input [31:0] inst, writedata,
   input clk,
   output [31:0] data1, data2, ImmGen,
-  output alusrc, memread, memwrite, memtoreg, branch, adressSrc, writeDataSrc,
+  output alusrc, aluSrcA, memread, memwrite, memtoreg, branch, adressSrc, writeDataSrc,
   output [1:0] aluop,
   output [9:0] funct
 );
 
   wire branch, memread, memtoreg, MemWrite, alusrc, regwrite;
-  wire adressSrc, writeDataSrc;
+  wire aluSrcA, adressSrc, writeDataSrc;
   wire [1:0] aluop;
   wire [4:0] writereg, rs1, rs2, rd;
   wire [6:0] opcode;
@@ -72,6 +72,7 @@ module decode (
     opcode,
     inst,
     alusrc,
+    aluSrcA,
     adressSrc,
     writeDataSrc,
     memtoreg,
@@ -90,7 +91,7 @@ endmodule
 module ControlUnit (
   input [6:0] opcode,
   input [31:0] inst,
-  output reg alusrc, adressSrc, writeDataSrc, memtoreg, regwrite, memread, memwrite, branch,
+  output reg alusrc, aluSrcA, adressSrc, writeDataSrc, memtoreg, regwrite, memread, memwrite, branch,
   output reg [1:0] aluop,
   output reg [31:0] ImmGen
 );
@@ -103,6 +104,7 @@ module ControlUnit (
     memwrite <= 0;
     branch   <= 0;
     aluop    <= 0;
+    aluSrcA  <= 0;
     adressSrc <= 0;
     writeDataSrc <= 0;
     ImmGen   <= 0;
@@ -141,9 +143,10 @@ module ControlUnit (
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
       7'b0100100: begin // ss == 36
-        alusrc   <= 1;
-        memwrite <= 1;
-        adressSrc <= 1;
+        alusrc       <= 1;
+        aluSrcA      <= 1;
+        memwrite     <= 1;
+        adressSrc    <= 1;
         writeDataSrc <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
@@ -180,20 +183,22 @@ endmodule
 
 module execute (
   input [31:0] in1, in2, ImmGen,
-  input alusrc,
+  input alusrc, aluSrcA,
   input [1:0] aluop,
   input [9:0] funct,
   output zero,
   output [31:0] aluout
 );
 
+  wire [31:0] alu_A;
   wire [31:0] alu_B;
   wire [3:0] aluctrl;
 
   assign alu_B = (alusrc) ? ImmGen : in2 ;
+  assign alu_A = aluSrcA ? in2 : in1;
 
   //Unidade Lógico Aritimética
-  ALU alu (aluctrl, in1, alu_B, aluout, zero);
+  ALU alu (aluctrl, alu_A, alu_B, aluout, zero);
 
   alucontrol alucontrol (aluop, funct, aluctrl);
 
@@ -278,7 +283,7 @@ endmodule
 module mips (input clk, rst, output [31:0] writedata);
 
   wire [31:0] inst, sigext, data1, data2, aluout, readdata;
-  wire zero, memread, memwrite, memtoreg, branch, alusrc;
+  wire zero, memread, memwrite, memtoreg, branch, alusrc, aluSrcA;
   wire adressSrc, writeDataSrc;
   wire [9:0] funct;
   wire [1:0] aluop;
@@ -295,6 +300,7 @@ module mips (input clk, rst, output [31:0] writedata);
     data2,
     sigext,
     alusrc,
+    aluSrcA,
     memread,
     memwrite,
     memtoreg,
@@ -306,7 +312,14 @@ module mips (input clk, rst, output [31:0] writedata);
   );
 
   // EXECUTE STAGE
-  execute execute (data1, data2, sigext, alusrc, aluop, funct, zero, aluout);
+  execute execute (
+    data1, data2, sigext,
+    alusrc, aluSrcA,
+    aluop,
+    funct,
+    zero,
+    aluout
+  );
 
   // MEMORY STAGE
   memory memory (
