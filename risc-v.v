@@ -14,9 +14,8 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
   initial begin
     // Exemplos
     inst_mem[0] <= 32'h00000000; // nop
-    inst_mem[1] <= 32'h00229113; // slli x5, x4, 2 - R[rd] = R[rs1] << imm
-    //////inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
-    //////inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
+    inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
+    inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
     // ---- ss
     // imm1   |rs2  |rs1  |fu3|im2  |opc
     // 0000000|00001|00101|000|01000|0100100
