@@ -14,8 +14,9 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
   initial begin
     // Exemplos
     inst_mem[0] <= 32'h00000000; // nop
-    inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
-    inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
+    inst_mem[1] <= 32'h00229113; // slli x5, x4, 2 - R[rd] = R[rs1] << imm
+    //////inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
+    //////inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
     // ---- ss
     // imm1   |rs2  |rs1  |fu3|im2  |opc
     // 0000000|00001|00101|000|01000|0100100
@@ -41,6 +42,13 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // 0000000|00010|01010|101|10110|1100100
     inst_mem[7] <= 32'b00000000001001010101101101100100; // BGE x10, x2, 22 [novo comando]
     // ----
+    // ####################################
+    // Shift the contents of register rs1 left by a number of bits specified in the immediate field, storing the result in rd
+    // immm       |rs1  |fc3|rd   |opc
+    // 00000000010|00101|001|00010|0010100 = 229113
+    // imm = 2; rs1 = 5; rd = 2
+    inst_mem[8] <= 32'b0000000001000101001000100010100; // slli x5, x4, 2 - R[rd] = R[rs1] << imm
+    // ####################################
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -148,12 +156,12 @@ module ControlUnit (
       7'b0110011: begin // R type == 51
         regwrite <= 1;
         aluop    <= 2;
-			end
+      end
       7'b1100011: begin // beq == 99
         branch   <= 1;
         aluop    <= 1;
         ImmGen   <= {{19{inst[31]}},inst[31],inst[7],inst[30:25],inst[11:8],1'b0};
-			end
+      end
       7'b0010011: begin // addi == 19
         alusrc   <= 1;
         regwrite <= 1;
@@ -186,6 +194,12 @@ module ControlUnit (
         writeDataSrc <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
+      7'b0010100: begin // #################################### slli
+        alusrc <= 1;
+        regwrite <=  1;
+        aluop <= 2;
+        ImmGen <= {{20{inst[31]}},inst[31:20]}; // repete 20x o msb e concatena a ele os 11 bits do imm
+      end // ####################################
       7'b0100101: begin // swap == 37
         regwrite <= 1;
         regWrite2 <= 1;
@@ -274,6 +288,7 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
       default: begin
         case (funct3)
           0: alucontrol <= (funct7 == 0) ? /*ADD*/ 4'd2 : /*SUB*/ 4'd6;
+          1: alucontrol <= 4'd5; // ####################################
           2: alucontrol <= 4'd7; // SLT
           4: alucontrol <= 4'd13; // BLT
           5: alucontrol <= 4'd14;
@@ -296,6 +311,7 @@ module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,
         0: aluout <= A & B; // AND
         1: aluout <= A | B; // OR
         2: aluout <= A + B; // ADD
+        5: aluout <= A << B; // SLLI ####################################
         6: aluout <= A - B; // SUB
         //7: aluout <= A < B ? 32'd1:32'd0; //SLT
         //12: aluout <= ~(A | B); // NOR
@@ -332,7 +348,7 @@ module memory (
   always @(posedge clk) begin
     if (memwrite)
       memory[address[31:2]] <= writeData;
-	end
+  end
 endmodule
 
 module writeback (input [31:0] aluout, readdata, input memtoreg, output reg [31:0] write_data);
