@@ -44,10 +44,16 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // ####################################
     // Shift the contents of register rs1 left by a number of bits specified in the immediate field, storing the result in rd
     // immm       |rs1  |fc3|rd   |opc
-    // 00000000010|00101|001|00010|0010100 = 229113
+    // 00000000010|00101|001|00010|0010100
     // imm = 2; rs1 = 5; rd = 2
-    inst_mem[8] <= 32'b0000000001000101001000100010100; // slli x5, x4, 2 - R[rd] = R[rs1] << imm
+    inst_mem[8] <= 32'b0000000001000101001000100010100; // slli x2, x5, 2 - R[rd] = R[rs1] << imm
     // ####################################
+    // ----
+    // ---- ORI
+    // immm       |rs1  |fc3|rd   |opc
+    // 00000001010|00101|110|00010|0100101
+    inst_mem[9] <= 32'b00000000001001010101101101100100; // ORI x2, x5, 10 [novo comando]
+    // ----
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -193,6 +199,12 @@ module ControlUnit (
         writeDataSrc <= 1;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
+      7'b0100101: begin // ORI == 37
+        alusrc <= 1;
+        regwrite <= 1;
+        aluop <= 2;
+        ImmGen   <= {{20{inst[31]}},inst[31:20]};
+      end
       7'b0010100: begin // #################################### slli
         alusrc <= 1;
         regwrite <=  1;
@@ -204,7 +216,7 @@ module ControlUnit (
         regWrite2 <= 1;
         writeregSrc <= 1;
       end
-      7'b1100100: begin // BGE == 100
+      7'b1100100: begin // BGE, BLT == 100
         branch   <= 1;
         aluop    <= 2;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
@@ -290,7 +302,7 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
           1: alucontrol <= 4'd5; // ####################################
           2: alucontrol <= 4'd7; // SLT
           4: alucontrol <= 4'd13; // BLT
-          5: alucontrol <= 4'd14;
+          5: alucontrol <= 4'd14; // BGE
           6: alucontrol <= 4'd1; // OR
           //39: alucontrol <= 4'd12; // NOR
           7: alucontrol <= 4'd0; // AND
