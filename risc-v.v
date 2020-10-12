@@ -31,6 +31,11 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // 0000000|01010|00010|000|00000|0100101
     inst_mem[5] <= 32'b00000000101000010000000000100101; // swap x2, x10 [novo comando]
     // ----
+    // ---- BGE
+    // [12:5] |rs2  |rs1  |fu3|[4:0]|opc
+    // 0000000|00010|01010|101|10110|1100100
+    inst_mem[6] <= 32'b00000000001001010101101101100100; // BGE x10, x2, 22 [novo comando]
+    // ----
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -181,6 +186,11 @@ module ControlUnit (
         regWrite2 <= 1;
         writeregSrc <= 1;
       end
+      7'b1100100: begin // BGE == 100
+        branch   <= 1;
+        aluop    <= 2;
+        ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
+      end
     endcase
   end
 
@@ -260,6 +270,7 @@ module alucontrol (input [1:0] aluop, input [9:0] funct, output reg [3:0] alucon
         case (funct3)
           0: alucontrol <= (funct7 == 0) ? /*ADD*/ 4'd2 : /*SUB*/ 4'd6;
           2: alucontrol <= 4'd7; // SLT
+          5: alucontrol <= 4'd14;
           6: alucontrol <= 4'd1; // OR
           //39: alucontrol <= 4'd12; // NOR
           7: alucontrol <= 4'd0; // AND
@@ -282,6 +293,10 @@ module ALU (input [3:0] alucontrol, input [31:0] A, B, output reg [31:0] aluout,
         6: aluout <= A - B; // SUB
         //7: aluout <= A < B ? 32'd1:32'd0; //SLT
         //12: aluout <= ~(A | B); // NOR
+        // aqui temos q colocar a operação contrária
+        // pois queremos que a condição seja satisfeita
+        // quanto zero = 1
+        14: aluout <= A < B; // zero if A >= B (BGE)
       default: aluout <= 0; //default 0, Nada acontece;
     endcase
   end
