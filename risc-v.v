@@ -48,6 +48,9 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // imm = 2; rs1 = 5; rd = 2
     inst_mem[8] <= 32'b0000000001000101001000100010100; // slli x5, x4, 2 - R[rd] = R[rs1] << imm
     // ####################################
+        // imm                 |rd   |opc
+    // 00000000000000001001|10000|0110111
+    inst_mem[9] <= 32'b00000000000000001001100000110111; // lui x20, 9
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -208,6 +211,9 @@ module ControlUnit (
         branch   <= 1;
         aluop    <= 2;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
+      end
+      7'b0110111: begin // lui
+        ImmGen   <= {inst[31:12],12'b0};
       end
     endcase
   end
