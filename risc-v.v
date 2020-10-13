@@ -226,6 +226,8 @@ module Register_Bank (
   reg [31:0] memory [0:31]; // 32 registers de 32 bits cada
   reg [31:0] writeReg1Data;
   reg [31:0] writeReg2Data;
+  reg [31:0] read_data1_init;
+  reg [31:0] read_data2_init;
   // fill the memory
   initial begin
     for (i = 0; i <= 31; i++)
@@ -233,10 +235,14 @@ module Register_Bank (
   end
 
   assign isSwap = (regwrite && regWrite2);
-  assign read_data1 = (regwrite && read_reg1==writereg) ? writedata : memory[read_reg1];
-  assign read_data2 = (regwrite && read_reg2==writereg) ? writedata : memory[read_reg2];
   assign writeReg1Data = isSwap ? memory[read_reg2] : writedata;
   assign writeReg2Data = isSwap ? memory[read_reg1] : memory[read_reg2];
+
+  assign read_data1_init = (regwrite && read_reg1==writereg) ? writedata : memory[read_reg1];
+  assign read_data2_init = (regwrite && read_reg2==writereg) ? writedata : memory[read_reg2];
+  assign read_data1 = isSwap ? writeReg1Data : read_data1_init;
+  assign read_data2 = isSwap ? writeReg2Data : read_data2_init;
+
 
   always @(posedge clk) begin
     if (regwrite) begin
