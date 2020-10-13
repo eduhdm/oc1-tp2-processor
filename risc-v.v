@@ -230,6 +230,7 @@ module ControlUnit (
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
       7'b0110111: begin // lui == 55
+      	regwrite <= 1;
         ImmGen   <= {inst[31:12],12'b0};
       end
       7'b1101111: begin // JUMP == 111
