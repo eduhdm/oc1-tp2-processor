@@ -1,9 +1,14 @@
-module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] inst);
+module fetch (
+  input zero, rst, clk, branch, jump,
+  input [31:0] sigext,
+  output [31:0] inst
+  );
 
-  wire [31:0] pc, pc_4, new_pc;
+  wire [31:0] pc, pc_4, new_pc, new_pc_old;
 
   assign pc_4 = 4 + pc; // pc+4  Adder
-  assign new_pc = (branch & zero) ? pc_4 + sigext : pc_4; // new PC Mux
+  assign new_pc_old = (branch & zero) ? pc_4 + sigext : pc_4; // new PC Mux
+  assign new_pc = jump ? sigext : new_pc_old;
 
   PC program_counter(new_pc, clk, rst, pc);
 
@@ -54,6 +59,18 @@ module fetch (input zero, rst, clk, branch, input [31:0] sigext, output [31:0] i
     // 00000001010|00101|110|00010|0100101
     inst_mem[9] <= 32'b00000000001001010101101101100100; // ORI x2, x5, 10 [novo comando]
     // ----
+    // Load with increment
+    // imm                 |rd   |opc
+    // 00000000000000001001|10000|0110111
+    inst_mem[10] <= 32'b00000000000000001001100000110111; // lui x20, 9
+    // ----
+    // ####################################
+    // JUMP
+    // i|[10:1]    |i|[19:12] |rd   |opc
+    // 0|0001100100|0|00000000|00000|1101111
+    // imm = 100; rd = 0
+    inst_mem[11] <= 32'b00001100100000000000000001101111; // jump 100 [jump $address]
+    // ####################################
     //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
     //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
     //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
@@ -78,7 +95,7 @@ module decode (
   input [31:0] inst, writedata,
   input clk,
   output [31:0] data1, data2, ImmGen,
-  output alusrc, aluSrcA, memread, memwrite, memtoreg, branch, adressSrc, writeDataSrc,
+  output alusrc, aluSrcA, memread, memwrite, memtoreg, branch, jump, adressSrc, writeDataSrc,
   output [1:0] aluop,
   output [9:0] funct
 );
@@ -110,6 +127,7 @@ module decode (
     memread,
     memwrite,
     branch,
+    jump,
     aluop,
     ImmGen
   );
@@ -139,6 +157,7 @@ module ControlUnit (
   memread,
   memwrite,
   branch,
+  jump,
   output reg [1:0] aluop,
   output reg [31:0] ImmGen
 );
@@ -157,6 +176,7 @@ module ControlUnit (
     adressSrc <= 0;
     writeDataSrc <= 0;
     ImmGen   <= 0;
+    jump     <= 0;
     case(opcode)
       7'b0110011: begin // R type == 51
         regwrite <= 1;
@@ -221,6 +241,14 @@ module ControlUnit (
         aluop    <= 2;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
+      7'b0110111: begin // lui == 55
+      	regwrite <= 1;
+        ImmGen   <= {inst[31:12],12'b0};
+      end
+      7'b1101111: begin // JUMP == 111
+        jump     <= 1;//           | [20]   | [19:12]   |[11]    | [10:1]
+        ImmGen   <= {{12{inst[31]}},inst[31],inst[19:12],inst[11],inst[30:21]};
+      end
     endcase
   end
 
@@ -238,6 +266,8 @@ module Register_Bank (
   reg [31:0] memory [0:31]; // 32 registers de 32 bits cada
   reg [31:0] writeReg1Data;
   reg [31:0] writeReg2Data;
+  reg [31:0] read_data1_init;
+  reg [31:0] read_data2_init;
   // fill the memory
   initial begin
     for (i = 0; i <= 31; i++)
@@ -245,10 +275,14 @@ module Register_Bank (
   end
 
   assign isSwap = (regwrite && regWrite2);
-  assign read_data1 = (regwrite && read_reg1==writereg) ? writedata : memory[read_reg1];
-  assign read_data2 = (regwrite && read_reg2==writereg) ? writedata : memory[read_reg2];
   assign writeReg1Data = isSwap ? memory[read_reg2] : writedata;
   assign writeReg2Data = isSwap ? memory[read_reg1] : memory[read_reg2];
+
+  assign read_data1_init = (regwrite && read_reg1==writereg) ? writedata : memory[read_reg1];
+  assign read_data2_init = (regwrite && read_reg2==writereg) ? writedata : memory[read_reg2];
+  assign read_data1 = isSwap ? writeReg1Data : read_data1_init;
+  assign read_data2 = isSwap ? writeReg2Data : read_data2_init;
+
 
   always @(posedge clk) begin
     if (regwrite) begin
@@ -373,12 +407,12 @@ module mips (input clk, rst, output [31:0] writedata);
 
   wire [31:0] inst, sigext, data1, data2, aluout, readdata;
   wire zero, memread, memwrite, memtoreg, branch, alusrc;
-  wire aluSrcA, adressSrc, writeDataSrc;
+  wire aluSrcA, adressSrc, writeDataSrc, jump;
   wire [9:0] funct;
   wire [1:0] aluop;
 
   // FETCH STAGE
-  fetch fetch (zero, rst, clk, branch, sigext, inst);
+  fetch fetch (zero, rst, clk, branch, jump, sigext, inst);
 
   // DECODE STAGE
   decode decode (
@@ -394,6 +428,7 @@ module mips (input clk, rst, output [31:0] writedata);
     memwrite,
     memtoreg,
     branch,
+    jump,
     adressSrc,
     writeDataSrc,
     aluop,
