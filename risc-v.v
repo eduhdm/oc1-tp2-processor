@@ -21,17 +21,18 @@ module fetch (
     inst_mem[0] <= 32'h00000000; // nop
     inst_mem[1] <= 32'h00500113; // addi x2, x0, 5  ok
     inst_mem[2] <= 32'h00210233; // add  x4, x2, x2  ok
-    // ---- ss
+    // ----
+    // ---- SS
     // imm1   |rs2  |rs1  |fu3|im2  |opc
     // 0000000|00001|00101|000|01000|0100100
     inst_mem[3] <= 32'b00000000000100101000010000100100; // ss  x5, x1, 8  [novo comando]
     // ----
-    // ---- lwi
+    // ---- LWI
     // imm1   |rs2  |rs1  |im3|rd   |opc
     // 0000000|00010|00010|000|00001|0000100
     inst_mem[4] <= 32'b00000000001000010000000010000100; // lwi x1, x2, x2 [novo comando]
     // ----
-    // ---- swap
+    // ---- SWAP
     // imm1   |rs2  |rs1  |im3|rd   |opc
     // 0000000|01010|00010|000|00000|0100101
     inst_mem[5] <= 32'b00000000101000010000000000100101; // swap x2, x10 [novo comando]
@@ -39,44 +40,33 @@ module fetch (
     // ---- BLT
     // [12:5] |rs2  |rs1  |fu3|[4:0]|opc
     // 0000000|00010|01010|100|10110|1100100
-    inst_mem[6] <= 32'b00000000001001010100101101100100; // BLT x10, x2, 22 [novo comando]
+    inst_mem[6] <= 32'b00000000001001010100101101100100; // blt x10, x2, 22 [novo comando]
     // ----
     // ---- BGE
     // [12:5] |rs2  |rs1  |fu3|[4:0]|opc
     // 0000000|00010|01010|101|10110|1100100
-    inst_mem[7] <= 32'b00000000001001010101101101100100; // BGE x10, x2, 22 [novo comando]
+    inst_mem[7] <= 32'b00000000001001010101101101100100; // bge x10, x2, 22 [novo comando]
     // ----
-    // ####################################
-    // Shift the contents of register rs1 left by a number of bits specified in the immediate field, storing the result in rd
+    // ---- SLLI
     // immm       |rs1  |fc3|rd   |opc
     // 00000000010|00101|001|00010|0010100
-    // imm = 2; rs1 = 5; rd = 2
-    inst_mem[8] <= 32'b0000000001000101001000100010100; // slli x2, x5, 2 - R[rd] = R[rs1] << imm
-    // ####################################
+    inst_mem[8] <= 32'b0000000001000101001000100010100; // slli x2, x5, 2
     // ----
     // ---- ORI
     // immm       |rs1  |fc3|rd   |opc
     // 00000001010|00101|110|00010|0001100
-    inst_mem[9] <= 32'b0000000101000101110000100001100; // ORI x2, x5, 10 [novo comando]
+    inst_mem[9] <= 32'b0000000101000101110000100001100; // ori x2, x5, 10 [novo comando]
     // ----
-    // Load with increment
+    // ---- LUI
     // imm                 |rd   |opc
     // 00000000000000001001|10000|0110111
     inst_mem[10] <= 32'b00000000000000001001100000110111; // lui x20, 9
     // ----
-    // ####################################
-    // JUMP
+    // ---- JUMP
     // i|[10:1]    |i|[19:12] |rd   |opc
     // 0|0001100100|0|00000000|00000|1101111
     // imm = 100; rd = 0
     inst_mem[11] <= 32'b00001100100000000000000001101111; // jump 100 [jump $address]
-    // ####################################
-    //inst_mem[1] <= 32'h00202223; // sw x2, 8(x0) ok
-    //inst_mem[1] <= 32'h0050a423; // sw x5, 8(x1) ok
-    //inst_mem[2] <= 32'h0000a003; // lw x1, x0(0) ok
-    //inst_mem[1] <= 32'hfff00113; // addi x2,x0,-1 ok
-    //inst_mem[2] <= 32'h00318133; // add x2, x3, x3 ok
-    //inst_mem[3] <= 32'h40328133; // sub x2, x5, x3 ok
   end
 
 endmodule
@@ -163,20 +153,20 @@ module ControlUnit (
 );
 
   always @(opcode) begin
-    alusrc   <= 0;
-    memtoreg <= 0;
-    regwrite <= 0;
-    memread  <= 0;
-    memwrite <= 0;
-    branch   <= 0;
-    aluop    <= 0;
-    writeregSrc <= 0;
-    regWrite2 <= 0;
-    aluSrcA  <= 0;
-    adressSrc <= 0;
+    alusrc       <= 0;
+    memtoreg     <= 0;
+    regwrite     <= 0;
+    memread      <= 0;
+    memwrite     <= 0;
+    branch       <= 0;
+    aluop        <= 0;
+    writeregSrc  <= 0;
+    regWrite2    <= 0;
+    aluSrcA      <= 0;
+    adressSrc    <= 0;
     writeDataSrc <= 0;
-    ImmGen   <= 0;
-    jump     <= 0;
+    ImmGen       <= 0;
+    jump         <= 0;
     case(opcode)
       7'b0110011: begin // R type == 51
         regwrite <= 1;
@@ -217,26 +207,26 @@ module ControlUnit (
         memwrite     <= 1;
         adressSrc    <= 1;
         writeDataSrc <= 1;
-        ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
+        ImmGen       <= {{20{inst[31]}},inst[31:25],inst[11:7]};
       end
-      7'b0001100: begin // ORI == 12
+      7'b0001100: begin // ori == 12
         alusrc    <= 1;
         regwrite  <= 1;
         aluop     <= 2;
         ImmGen    <= {{20{inst[31]}},inst[31:20]};
       end
-      7'b0010100: begin // #################################### slli
-        alusrc <= 1;
+      7'b0010100: begin // slli
+        alusrc   <= 1;
         regwrite <=  1;
-        aluop <= 2;
-        ImmGen <= {{20{inst[31]}},inst[31:20]}; // repete 20x o msb e concatena a ele os 11 bits do imm
-      end // ####################################
+        aluop    <= 2;
+        ImmGen   <= {{20{inst[31]}},inst[31:20]};
+      end
       7'b0100101: begin // swap == 37
-        regwrite <= 1;
-        regWrite2 <= 1;
+        regwrite    <= 1;
+        regWrite2   <= 1;
         writeregSrc <= 1;
       end
-      7'b1100100: begin // BGE, BLT == 100
+      7'b1100100: begin // bge, blt == 100
         branch   <= 1;
         aluop    <= 2;
         ImmGen   <= {{20{inst[31]}},inst[31:25],inst[11:7]};
@@ -245,7 +235,7 @@ module ControlUnit (
       	regwrite <= 1;
         ImmGen   <= {inst[31:12],12'b0};
       end
-      7'b1101111: begin // JUMP == 111
+      7'b1101111: begin // jump == 111
         jump     <= 1;//           | [20]   | [19:12]   |[11]    | [10:1]
         ImmGen   <= {{12{inst[31]}},inst[31],inst[19:12],inst[11],inst[30:21]};
       end
